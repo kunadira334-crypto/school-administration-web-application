@@ -2,191 +2,160 @@ import {
   ActivityLog,
   ArchivedLetter,
   Attendance,
-  CLASS_LIST,
   LetterTemplate,
   Settings,
   Student,
   User,
 } from '../types';
 
-const KEYS = {
-  USERS: 'sim_users',
-  STUDENTS: 'sim_students',
-  ATTENDANCE: 'sim_attendance',
-  TEMPLATES: 'sim_templates',
-  SETTINGS: 'sim_settings',
-  LOGS: 'sim_logs',
-  LETTERS: 'sim_letters',
-  SEEDED: 'sim_seeded_v1',
+const DEFAULT_SETTINGS: Settings = {
+  namaYayasan: 'YAYASAN MAMBAUL ULUM',
+  namaMadrasah: 'MI MAMBAUL ULUM SUMBERDUREN',
+  alamat: 'Sumberduren, Jawa Timur',
+  telepon: '',
+  email: '',
+  npsn: '-',
+  logoSekolahUrl: '',
+  logoSuratUrl: '',
+  namaKepalaSekolah: 'Kepala Madrasah',
+  nipKepalaSekolah: '-',
+  nomorSuratPrefix: 'MI.MU/SD/',
+  warnaTema: '#0f766e',
 };
 
-function read<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function write<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-const sampleNamesByClass: Record<string, [string, 'L' | 'P'][]> = {
-  '1': [
-    ['Ahmad Fauzan', 'L'],
-    ['Siti Aisyah', 'P'],
-    ['Muhammad Rizki', 'L'],
-    ['Nayla Putri', 'P'],
-  ],
-  '2': [
-    ['Dwi Cahyono', 'L'],
-    ['Indah Lestari', 'P'],
-    ['Rafi Ardiansyah', 'L'],
-  ],
-  '3': [
-    ['Salsabila Zahra', 'P'],
-    ['Yusuf Hidayat', 'L'],
-    ['Putri Amelia', 'P'],
-  ],
-  '4': [
-    ['Fajar Nugroho', 'L'],
-    ['Alya Ramadhani', 'P'],
-    ['Bintang Saputra', 'L'],
-  ],
-  '5': [
-    ['Zaskia Aulia', 'P'],
-    ['Dimas Prasetyo', 'L'],
-    ['Wulan Sari', 'P'],
-  ],
-  '6A': [
-    ['Nur Kholis', 'L'],
-    ['Fatimatuz Zahro', 'P'],
-    ['Bagas Setiawan', 'L'],
-  ],
-  '6B': [
-    ['Rehan Maulana', 'L'],
-    ['Diah Ayu Kusuma', 'P'],
-    ['Irfan Maulidan', 'L'],
-  ],
+type Snapshot = {
+  users: User[];
+  students: Student[];
+  attendance: Attendance[];
+  templates: LetterTemplate[];
+  settings: Settings;
+  logs: ActivityLog[];
+  letters: ArchivedLetter[];
 };
 
-function generateId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+let token = localStorage.getItem('sim_api_token') || '';
+let cache: Snapshot = {
+  users: [], students: [], attendance: [], templates: [],
+  settings: DEFAULT_SETTINGS, logs: [], letters: [],
+};
+
+const queues: Record<string, Promise<unknown>> = {};
+
+function reportError(error: unknown) {
+  const message = error instanceof Error ? error.message : 'Gagal menyimpan data ke server.';
+  console.error(error);
+  window.dispatchEvent(new CustomEvent('school-api-error', { detail: message }));
 }
 
-function seedIfNeeded() {
-  if (localStorage.getItem(KEYS.SEEDED)) return;
-
-  const users: User[] = [
-    { username: 'admin', password: 'admin123', role: 'admin', nama: 'Administrator', kelas: '', aktif: true },
-  ];
-  CLASS_LIST.forEach((k) => {
-    users.push({
-      username: 'wali' + k.toLowerCase(),
-      password: 'wali123',
-      role: 'wali_kelas',
-      nama: 'Wali Kelas ' + k,
-      kelas: k,
-      aktif: true,
-    });
-  });
-  write(KEYS.USERS, users);
-
-  const students: Student[] = [];
-  CLASS_LIST.forEach((k) => {
-    (sampleNamesByClass[k] || []).forEach((s, i) => {
-      students.push({
-        id: generateId('SIS'),
-        nis: `2025${k}0${i + 1}`,
-        nisn: `000000${k}${i + 1}`,
-        nama: s[0],
-        jenisKelamin: s[1],
-        kelas: k,
-        namaOrtu: 'Wali dari ' + s[0],
-        noHpOrtu: '0812345678' + i,
-        alamat: 'Sumberduren',
-        aktif: true,
-      });
-    });
-  });
-  write(KEYS.STUDENTS, students);
-
-  write(KEYS.ATTENDANCE, [] as Attendance[]);
-
-  const templates: LetterTemplate[] = [
-    {
-      id: generateId('TPL'),
-      judul: 'Surat Izin Tidak Masuk Sekolah',
-      isi:
-        'Yang bertanda tangan di bawah ini, Kepala {{namaMadrasah}} menerangkan bahwa:\n\n' +
-        'Nama\t: {{namaSiswa}}\nKelas\t: {{kelas}}\nNIS\t: {{nis}}\n\n' +
-        'Diizinkan tidak mengikuti kegiatan belajar mengajar pada tanggal {{tanggalIzin}} dikarenakan {{alasan}}.\n\n' +
-        'Demikian surat izin ini dibuat untuk dapat dipergunakan sebagaimana mestinya.',
-      aktif: true,
+async function apiCall<T>(payload: Record<string, unknown>, authenticated = true): Promise<T> {
+  const response = await fetch('/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authenticated && token ? { Authorization: `Bearer ${token}` } : {}),
     },
-  ];
-  write(KEYS.TEMPLATES, templates);
-
-  const settings: Settings = {
-    namaYayasan: 'YAYASAN MAMBAUL ULUM',
-    namaMadrasah: 'MI MAMBAUL ULUM SUMBERDUREN',
-    alamat: 'Jl. Pendidikan No. 1, Sumberduren, Jawa Timur',
-    telepon: '08xxxxxxxxxx',
-    email: 'mi.mambaululum.sumberduren@gmail.com',
-    npsn: '-',
-    logoSekolahUrl: '',
-    logoSuratUrl: '',
-    namaKepalaSekolah: 'H. Abdul Rohman, S.Pd.I',
-    nipKepalaSekolah: '-',
-    nomorSuratPrefix: 'MI.MU/SD/',
-    warnaTema: '#0f766e',
-  };
-  write(KEYS.SETTINGS, settings);
-
-  write(KEYS.LOGS, [] as ActivityLog[]);
-  write(KEYS.LETTERS, [] as ArchivedLetter[]);
-
-  localStorage.setItem(KEYS.SEEDED, '1');
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({ ok: false, error: 'Respons server tidak valid.' }));
+  if (!response.ok || !result.ok) {
+    if (response.status === 401 && authenticated) {
+      localStorage.removeItem('sim_api_token');
+      localStorage.removeItem('sim_session_user');
+    }
+    throw new Error(result.error || `Server error ${response.status}`);
+  }
+  return result.data as T;
 }
 
-seedIfNeeded();
+function queueSync(resource: string, data: unknown): Promise<void> {
+  const previous = queues[resource] || Promise.resolve();
+  const next = previous.catch(() => undefined).then(() => apiCall<void>({ action: 'replace', resource, data }));
+  queues[resource] = next;
+  next.catch(reportError);
+  return next;
+}
 
 export const db = {
-  getUsers: (): User[] => read(KEYS.USERS, []),
-  saveUsers: (u: User[]) => write(KEYS.USERS, u),
-
-  getStudents: (): Student[] => read(KEYS.STUDENTS, []),
-  saveStudents: (s: Student[]) => write(KEYS.STUDENTS, s),
-
-  getAttendance: (): Attendance[] => read(KEYS.ATTENDANCE, []),
-  saveAttendance: (a: Attendance[]) => write(KEYS.ATTENDANCE, a),
-
-  getTemplates: (): LetterTemplate[] => read(KEYS.TEMPLATES, []),
-  saveTemplates: (t: LetterTemplate[]) => write(KEYS.TEMPLATES, t),
-
-  getSettings: (): Settings => read(KEYS.SETTINGS, {} as Settings),
-  saveSettings: (s: Settings) => write(KEYS.SETTINGS, s),
-
-  getLogs: (): ActivityLog[] => read(KEYS.LOGS, []),
-  addLog: (username: string, aksi: string, detail: string) => {
-    const logs = read<ActivityLog[]>(KEYS.LOGS, []);
-    logs.unshift({ timestamp: new Date().toISOString(), username, aksi, detail });
-    write(KEYS.LOGS, logs.slice(0, 300));
+  setToken(value: string) {
+    token = value;
+    if (value) localStorage.setItem('sim_api_token', value);
+    else localStorage.removeItem('sim_api_token');
   },
 
-  getLetters: (): ArchivedLetter[] => read(KEYS.LETTERS, []),
-  addLetter: (l: ArchivedLetter) => {
-    const letters = read<ArchivedLetter[]>(KEYS.LETTERS, []);
-    letters.unshift(l);
-    write(KEYS.LETTERS, letters);
+  getToken: () => token,
+
+  async loadPublicSettings() {
+    try {
+      cache.settings = await apiCall<Settings>({ action: 'publicSettings' }, false);
+    } catch (error) {
+      reportError(error);
+    }
   },
 
-  generateId,
+  async login(username: string, password: string) {
+    return apiCall<{ token: string; user: User }>({ action: 'login', username, password }, false);
+  },
+
+  async initialize(value?: string) {
+    if (value) db.setToken(value);
+    const snapshot = await apiCall<Snapshot>({ action: 'bootstrap' });
+    cache = { ...snapshot, settings: { ...DEFAULT_SETTINGS, ...snapshot.settings } };
+  },
+
+  getUsers: () => cache.users,
+  saveUsers(users: User[]) {
+    cache.users = users;
+    return queueSync('users', users);
+  },
+
+  getStudents: () => cache.students,
+  saveStudents(students: Student[]) {
+    cache.students = students;
+    return queueSync('students', students);
+  },
+
+  getAttendance: () => cache.attendance,
+  saveAttendance(attendance: Attendance[]) {
+    cache.attendance = attendance;
+    return queueSync('attendance', attendance);
+  },
+
+  getTemplates: () => cache.templates,
+  saveTemplates(templates: LetterTemplate[]) {
+    cache.templates = templates;
+    return queueSync('templates', templates);
+  },
+
+  getSettings: () => cache.settings,
+  saveSettings(settings: Settings) {
+    cache.settings = settings;
+    return queueSync('settings', settings);
+  },
+
+  getLogs: () => cache.logs,
+  addLog(username: string, aksi: string, detail: string) {
+    const item = { timestamp: new Date().toISOString(), username, aksi, detail };
+    cache.logs = [item, ...cache.logs].slice(0, 500);
+    apiCall<void>({ action: 'appendLog', aksi, detail }).catch(reportError);
+  },
+
+  getLetters: () => cache.letters,
+  addLetter(letter: ArchivedLetter) {
+    cache.letters = [letter, ...cache.letters];
+    apiCall<void>({ action: 'appendLetter', data: letter }).catch(reportError);
+  },
+
+  async uploadLogo(file: File) {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Gagal membaca file logo.'));
+      reader.readAsDataURL(file);
+    });
+    return apiCall<{ url: string }>({ action: 'uploadLogo', dataUrl, fileName: file.name });
+  },
+
+  generateId(prefix: string) {
+    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  },
 };
-
-export function resetDemoData() {
-  Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
-  seedIfNeeded();
-}

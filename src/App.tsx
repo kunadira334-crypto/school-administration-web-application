@@ -71,7 +71,18 @@ function TeacherApp() {
 }
 
 function Main() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-teal-950 flex items-center justify-center p-6">
+        <div className="rounded-xl bg-white px-8 py-6 text-center shadow-xl">
+          <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-4 border-teal-100 border-t-teal-700" />
+          <p className="font-semibold text-teal-900">Menghubungkan ke Google Spreadsheet…</p>
+          <p className="mt-1 text-xs text-gray-500">Mohon tunggu sebentar</p>
+        </div>
+      </div>
+    );
+  }
   if (!user) return <LoginPage />;
   return user.role === 'admin' ? <AdminApp /> : <TeacherApp />;
 }

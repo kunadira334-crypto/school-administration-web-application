@@ -24,9 +24,8 @@ export default function AdminDashboardHome() {
         <h3 className="font-bold text-gray-700 mb-1">Selamat datang, {user?.nama} 👋</h3>
         <p className="text-sm text-gray-500">
           Gunakan menu di samping untuk mengelola data sekolah, kelas, siswa, wali kelas, kehadiran, template
-          surat, dan mencetak surat izin secara otomatis. Semua data pada demo ini tersimpan di penyimpanan
-          lokal browser (localStorage), merepresentasikan Google Spreadsheet &amp; Google Drive pada versi produksi
-          (lihat paket kode Google Apps Script yang disertakan).
+          surat, dan mencetak surat izin secara otomatis. Semua data aplikasi tersimpan dan tersinkronisasi
+          langsung dengan Google Spreadsheet melalui API server Vercel.
         </p>
       </Card>
     </div>
