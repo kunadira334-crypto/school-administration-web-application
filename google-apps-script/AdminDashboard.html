@@ -1,0 +1,191 @@
+<!-- ======================= ADMIN: DASHBOARD ======================= -->
+<section id="page-admin-dashboard" class="page">
+  <h2 class="page-title">Dashboard Admin</h2>
+  <p class="page-sub">Ringkasan data sekolah MI Mambaul Ulum Sumberduren</p>
+  <div class="grid grid-4" id="adminStatCards">
+    <div class="card stat-card"><div class="num" id="statSiswa">-</div><div class="label">Total Siswa</div></div>
+    <div class="card stat-card"><div class="num" id="statKelas">-</div><div class="label">Total Kelas</div></div>
+    <div class="card stat-card"><div class="num" id="statGuru">-</div><div class="label">Wali Kelas</div></div>
+    <div class="card stat-card"><div class="num" id="statHadirHariIni">-</div><div class="label">Hadir Hari Ini</div></div>
+  </div>
+  <div class="card">
+    <h3>Selamat datang, <span id="welcomeName"></span> 👋</h3>
+    <p style="color:var(--muted);">Gunakan menu di samping untuk mengelola data sekolah, kelas, siswa, wali kelas,
+      kehadiran, template surat, dan mencetak surat izin.</p>
+  </div>
+</section>
+
+<!-- ======================= ADMIN: DATA SEKOLAH (ringkas, detail ada di Settings) ======================= -->
+<section id="page-admin-sekolah" class="page">
+  <h2 class="page-title">Data Sekolah</h2>
+  <p class="page-sub">Profil Yayasan &amp; Madrasah. Untuk mengubah, buka menu Pengaturan.</p>
+  <div class="card" id="viewDataSekolah">Memuat...</div>
+</section>
+
+<!-- ======================= ADMIN: DATA KELAS ======================= -->
+<section id="page-admin-kelas" class="page">
+  <h2 class="page-title">Data Kelas</h2>
+  <p class="page-sub">Daftar rombongan belajar (Kelas 1 s/d 6, dengan Kelas 6A &amp; 6B)</p>
+  <div class="grid grid-3" id="listKelasCard"></div>
+</section>
+
+<!-- ======================= ADMIN: DATA SISWA ======================= -->
+<section id="page-admin-siswa" class="page">
+  <h2 class="page-title">Data Siswa</h2>
+  <p class="page-sub">Kelola data siswa per kelas</p>
+  <div class="toolbar">
+    <div class="field" style="min-width:160px;margin-bottom:0;">
+      <label>Filter Kelas</label>
+      <select id="filterKelasSiswa"><option value="">Semua Kelas</option></select>
+    </div>
+    <button class="btn btn-primary" onclick="openStudentModal()">+ Tambah Siswa</button>
+  </div>
+  <div class="card">
+    <table id="tableSiswa">
+      <thead><tr><th>NIS</th><th>Nama</th><th>L/P</th><th>Kelas</th><th>Nama Ortu</th><th>No HP</th><th>Aksi</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================= ADMIN: WALI KELAS & PENGGUNA ======================= -->
+<section id="page-admin-users" class="page">
+  <h2 class="page-title">Akun Pengguna (Admin &amp; Wali Kelas)</h2>
+  <p class="page-sub">Kelola akun login untuk admin dan wali kelas</p>
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openUserModal()">+ Tambah Akun</button>
+  </div>
+  <div class="card">
+    <table id="tableUsers">
+      <thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Kelas</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================= ADMIN: TEMPLATE SURAT ======================= -->
+<section id="page-admin-template" class="page">
+  <h2 class="page-title">Template Surat Izin</h2>
+  <p class="page-sub">Gunakan placeholder: {{namaYayasan}}, {{namaMadrasah}}, {{alamat}}, {{namaSiswa}}, {{kelas}}, {{nis}}, {{tanggalIzin}}, {{alasan}}</p>
+  <div class="card">
+    <div class="field"><label>Judul Surat</label><input id="tplJudul"></div>
+    <div class="field"><label>Isi Surat</label><textarea id="tplIsi" rows="10"></textarea></div>
+    <input type="hidden" id="tplId">
+    <button class="btn btn-primary" onclick="saveTemplate()">Simpan Template</button>
+  </div>
+</section>
+
+<!-- ======================= ADMIN: CETAK SURAT IZIN ======================= -->
+<section id="page-admin-cetak" class="page">
+  <h2 class="page-title">Cetak Surat Izin</h2>
+  <p class="page-sub">Buat surat izin otomatis berdasarkan data siswa</p>
+  <div class="card grid grid-2">
+    <div class="field">
+      <label>Kelas</label>
+      <select id="cetakKelas" onchange="loadStudentsForLetter()"><option value="">Pilih Kelas</option></select>
+    </div>
+    <div class="field">
+      <label>Nama Siswa</label>
+      <select id="cetakSiswa"></select>
+    </div>
+    <div class="field">
+      <label>Tanggal Izin</label>
+      <input type="date" id="cetakTanggal">
+    </div>
+    <div class="field">
+      <label>Alasan</label>
+      <input type="text" id="cetakAlasan" placeholder="mis. sakit demam / acara keluarga">
+    </div>
+    <div class="field">
+      <label>Nomor Surat (opsional, otomatis jika kosong)</label>
+      <input type="text" id="cetakNomor">
+    </div>
+    <div class="field">
+      <label>Template Surat</label>
+      <select id="cetakTemplate"></select>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="cetakSuratIzin()">🖨️ Buat &amp; Cetak Surat</button>
+  <p id="cetakArchiveInfo" style="margin-top:10px;color:var(--muted);font-size:13px;"></p>
+</section>
+
+<!-- ======================= ADMIN: REKAP KEHADIRAN ======================= -->
+<section id="page-admin-kehadiran" class="page">
+  <h2 class="page-title">Rekap Kehadiran</h2>
+  <p class="page-sub">Filter berdasarkan tanggal, kelas, dan status</p>
+  <div class="toolbar">
+    <div class="field" style="margin-bottom:0;"><label>Kelas</label>
+      <select id="rekapKelas"><option value="">Semua</option></select></div>
+    <div class="field" style="margin-bottom:0;"><label>Dari Tanggal</label><input type="date" id="rekapDariTgl"></div>
+    <div class="field" style="margin-bottom:0;"><label>Sampai Tanggal</label><input type="date" id="rekapSampaiTgl"></div>
+    <div class="field" style="margin-bottom:0;"><label>Status</label>
+      <select id="rekapStatus"><option value="">Semua</option><option>Hadir</option><option>Izin</option><option>Sakit</option><option>Alpha</option></select></div>
+    <button class="btn btn-primary" onclick="loadRekapAdmin()">Terapkan Filter</button>
+  </div>
+  <div class="card">
+    <h3>Rekap per Siswa</h3>
+    <table id="tableRekapSiswa">
+      <thead><tr><th>Nama</th><th>Kelas</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Detail Kehadiran</h3>
+    <table id="tableDetailKehadiran">
+      <thead><tr><th>Tanggal</th><th>Kelas</th><th>Nama</th><th>Status</th><th>Catatan</th><th>Input Oleh</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================= ADMIN: LOG AKTIVITAS ======================= -->
+<section id="page-admin-log" class="page">
+  <h2 class="page-title">Log Aktivitas</h2>
+  <p class="page-sub">Riwayat aktivitas pengguna (300 log terbaru)</p>
+  <div class="card">
+    <table id="tableLog">
+      <thead><tr><th>Waktu</th><th>Username</th><th>Aksi</th><th>Detail</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================= MODAL: TAMBAH/EDIT SISWA ======================= -->
+<div id="modalStudent" class="modal-overlay hidden">
+  <div class="modal">
+    <h3 id="modalStudentTitle">Tambah Siswa</h3>
+    <input type="hidden" id="stuId">
+    <div class="field"><label>NIS</label><input id="stuNis"></div>
+    <div class="field"><label>NISN</label><input id="stuNisn"></div>
+    <div class="field"><label>Nama Lengkap</label><input id="stuNama"></div>
+    <div class="field"><label>Jenis Kelamin</label>
+      <select id="stuJk"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+    <div class="field"><label>Kelas</label><select id="stuKelas"></select></div>
+    <div class="field"><label>Nama Orang Tua/Wali</label><input id="stuOrtu"></div>
+    <div class="field"><label>No HP Orang Tua</label><input id="stuHp"></div>
+    <div class="field"><label>Alamat</label><textarea id="stuAlamat" rows="2"></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:end;margin-top:14px;">
+      <button class="btn btn-outline" onclick="closeModal('modalStudent')">Batal</button>
+      <button class="btn btn-primary" onclick="submitStudent()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL: TAMBAH/EDIT USER ======================= -->
+<div id="modalUser" class="modal-overlay hidden">
+  <div class="modal">
+    <h3 id="modalUserTitle">Tambah Akun</h3>
+    <div class="field"><label>Username</label><input id="usrUsername"></div>
+    <div class="field"><label>Password <span id="usrPwHint" style="font-weight:400;"></span></label><input id="usrPassword" type="text"></div>
+    <div class="field"><label>Nama Lengkap</label><input id="usrNama"></div>
+    <div class="field"><label>Role</label>
+      <select id="usrRole" onchange="toggleUserKelasField()"><option value="admin">Admin</option><option value="wali_kelas">Wali Kelas</option></select></div>
+    <div class="field" id="usrKelasField"><label>Kelas Diampu</label><select id="usrKelas"></select></div>
+    <div class="field"><label>Status</label>
+      <select id="usrAktif"><option value="true">Aktif</option><option value="false">Nonaktif</option></select></div>
+    <div style="display:flex;gap:8px;justify-content:end;margin-top:14px;">
+      <button class="btn btn-outline" onclick="closeModal('modalUser')">Batal</button>
+      <button class="btn btn-primary" onclick="submitUser()">Simpan</button>
+    </div>
+  </div>
+</div>

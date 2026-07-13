@@ -1,0 +1,37 @@
+<!-- ======================= ADMIN: PENGATURAN TAMPILAN & SURAT ======================= -->
+<section id="page-admin-settings" class="page">
+  <h2 class="page-title">Pengaturan Aplikasi &amp; Surat</h2>
+  <p class="page-sub">Kelola profil sekolah, logo, dan elemen surat resmi</p>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Logo Aplikasi (Sekolah)</h3>
+      <img id="previewLogoSekolah" class="logo-preview" src="" alt="Logo Sekolah">
+      <input type="file" id="fileLogoSekolah" accept="image/*">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="uploadLogoFile('sekolah')">Unggah &amp; Simpan</button>
+    </div>
+    <div class="card">
+      <h3>Logo Kop Surat</h3>
+      <img id="previewLogoSurat" class="logo-preview" src="" alt="Logo Surat">
+      <input type="file" id="fileLogoSurat" accept="image/*">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="uploadLogoFile('surat')">Unggah &amp; Simpan</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Profil Yayasan &amp; Madrasah</h3>
+    <div class="grid grid-2">
+      <div class="field"><label>Nama Yayasan</label><input id="setNamaYayasan"></div>
+      <div class="field"><label>Nama Madrasah</label><input id="setNamaMadrasah"></div>
+      <div class="field"><label>Alamat</label><input id="setAlamat"></div>
+      <div class="field"><label>Telepon</label><input id="setTelepon"></div>
+      <div class="field"><label>Email</label><input id="setEmail"></div>
+      <div class="field"><label>NPSN</label><input id="setNpsn"></div>
+      <div class="field"><label>Nama Kepala Madrasah</label><input id="setNamaKepsek"></div>
+      <div class="field"><label>NIP Kepala Madrasah</label><input id="setNipKepsek"></div>
+      <div class="field"><label>Prefix Nomor Surat</label><input id="setNomorPrefix"></div>
+      <div class="field"><label>Warna Tema (hex)</label><input id="setWarnaTema"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveAllSettings()">Simpan Pengaturan</button>
+  </div>
+</section>

@@ -1,0 +1,555 @@
+<script>
+/*******************************************************************
+ * CLIENT-SIDE LOGIC
+ * Semua komunikasi ke server menggunakan google.script.run.
+ * Token sesi disimpan di localStorage browser (bukan cookie),
+ * dan dikirim ulang di setiap pemanggilan fungsi server yang butuh auth.
+ *******************************************************************/
+var STATE = {
+  token: localStorage.getItem('simToken') || null,
+  user: JSON.parse(localStorage.getItem('simUser') || 'null'),
+  settings: null,
+  classes: []
+};
+
+function toast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'msg ' + (type === 'err' ? 'err' : 'ok');
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(function () { el.remove(); }, 3500);
+}
+
+function serverCall(fnName, args, onSuccess, onError) {
+  var runner = google.script.run
+    .withSuccessHandler(function (res) { onSuccess && onSuccess(res); })
+    .withFailureHandler(function (err) {
+      var msg = (err && err.message) || String(err);
+      if (msg.indexOf('SESSION_EXPIRED') !== -1) {
+        toast('Sesi berakhir, silakan login kembali.', 'err');
+        doLogout(true);
+      } else if (msg.indexOf('AKSES_DITOLAK') !== -1) {
+        toast('Akses ditolak untuk aksi ini.', 'err');
+      } else {
+        toast('Terjadi kesalahan: ' + msg, 'err');
+      }
+      onError && onError(err);
+    });
+  runner[fnName].apply(runner, args);
+}
+
+/* ============================ LOGIN / LOGOUT ============================ */
+document.getElementById('formLogin').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var u = document.getElementById('loginUsername').value.trim();
+  var p = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  serverCall('loginUser', [u, p], function (res) {
+    if (res.success) {
+      STATE.token = res.token;
+      STATE.user = res.user;
+      localStorage.setItem('simToken', res.token);
+      localStorage.setItem('simUser', JSON.stringify(res.user));
+      bootApp();
+    } else {
+      document.getElementById('loginError').textContent = res.message;
+    }
+  });
+});
+
+function doLogout(silent) {
+  if (STATE.token) serverCall('logoutUser', [STATE.token], function () {});
+  localStorage.removeItem('simToken');
+  localStorage.removeItem('simUser');
+  STATE.token = null; STATE.user = null;
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+  if (!silent) toast('Anda telah keluar.');
+}
+document.getElementById('btnLogout').addEventListener('click', function () { doLogout(false); });
+
+document.getElementById('btnToggleSidebar').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+
+/* ============================ BOOT APP ============================ */
+function bootApp() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('userInfo').textContent = STATE.user.nama + ' (' + roleLabel(STATE.user.role) + ')';
+  buildMenu();
+  loadSettingsGlobal();
+  serverCall('getClasses', [STATE.token], function (classes) {
+    STATE.classes = classes;
+    populateClassSelects(classes);
+    if (STATE.user.role === 'admin') {
+      goToPage('page-admin-dashboard');
+      loadAdminDashboardStats();
+    } else {
+      document.getElementById('waliWelcomeName').textContent = STATE.user.nama;
+      document.getElementById('waliKelasLabel').textContent = STATE.user.kelas;
+      goToPage('page-wali-dashboard');
+      loadWaliDashboardStats();
+    }
+  });
+}
+
+function roleLabel(r) { return r === 'admin' ? 'Admin' : 'Wali Kelas'; }
+
+function loadSettingsGlobal() {
+  serverCall('getSettings', [STATE.token], function (s) {
+    STATE.settings = s;
+    if (s.logoSekolahUrl) {
+      document.getElementById('topLogo').src = s.logoSekolahUrl;
+      document.getElementById('topLogo').style.display = 'inline-block';
+      document.getElementById('loginLogo').src = s.logoSekolahUrl;
+      document.getElementById('loginLogo').style.display = 'block';
+    }
+    if (document.getElementById('previewLogoSekolah')) {
+      document.getElementById('previewLogoSekolah').src = s.logoSekolahUrl || '';
+      document.getElementById('previewLogoSurat').src = s.logoSuratUrl || '';
+      document.getElementById('setNamaYayasan').value = s.namaYayasan || '';
+      document.getElementById('setNamaMadrasah').value = s.namaMadrasah || '';
+      document.getElementById('setAlamat').value = s.alamat || '';
+      document.getElementById('setTelepon').value = s.telepon || '';
+      document.getElementById('setEmail').value = s.email || '';
+      document.getElementById('setNpsn').value = s.npsn || '';
+      document.getElementById('setNamaKepsek').value = s.namaKepalaSekolah || '';
+      document.getElementById('setNipKepsek').value = s.nipKepalaSekolah || '';
+      document.getElementById('setNomorPrefix').value = s.nomorSuratPrefix || '';
+      document.getElementById('setWarnaTema').value = s.warnaTema || '';
+    }
+    var el = document.getElementById('viewDataSekolah');
+    if (el) {
+      el.innerHTML = '<table>' +
+        row('Nama Yayasan', s.namaYayasan) + row('Nama Madrasah', s.namaMadrasah) +
+        row('Alamat', s.alamat) + row('Telepon', s.telepon) + row('Email', s.email) +
+        row('NPSN', s.npsn) + row('Kepala Madrasah', s.namaKepalaSekolah) + '</table>';
+    }
+  });
+  function row(a, b) { return '<tr><td style="font-weight:600;width:180px;">' + a + '</td><td>' + (b || '-') + '</td></tr>'; }
+}
+
+function populateClassSelects(classes) {
+  var selects = ['filterKelasSiswa', 'stuKelas', 'usrKelas', 'cetakKelas', 'rekapKelas'];
+  selects.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var keepFirst = (id === 'filterKelasSiswa' || id === 'cetakKelas' || id === 'rekapKelas');
+    if (!keepFirst) el.innerHTML = '';
+    classes.forEach(function (k) {
+      var opt = document.createElement('option');
+      opt.value = k; opt.textContent = 'Kelas ' + k;
+      el.appendChild(opt);
+    });
+  });
+  var listKelasCard = document.getElementById('listKelasCard');
+  if (listKelasCard) {
+    listKelasCard.innerHTML = classes.map(function (k) {
+      return '<div class="card"><h3>Kelas ' + k + '</h3><p style="color:var(--muted);">Rombongan belajar Kelas ' + k + '</p></div>';
+    }).join('');
+  }
+}
+
+/* ============================ MENU / NAVIGASI ============================ */
+function buildMenu() {
+  var nav = document.getElementById('navMenu');
+  var items = STATE.user.role === 'admin' ? [
+    ['page-admin-dashboard', '🏠 Dashboard'],
+    ['page-admin-sekolah', '🏫 Data Sekolah'],
+    ['page-admin-kelas', '📚 Data Kelas'],
+    ['page-admin-siswa', '🧑‍🎓 Data Siswa'],
+    ['page-admin-users', '👥 Akun Pengguna'],
+    ['page-admin-kehadiran', '📅 Rekap Kehadiran'],
+    ['page-admin-template', '✉️ Template Surat'],
+    ['page-admin-cetak', '🖨️ Cetak Surat Izin'],
+    ['page-admin-settings', '⚙️ Pengaturan'],
+    ['page-admin-log', '📜 Log Aktivitas']
+  ] : [
+    ['page-wali-dashboard', '🏠 Dashboard'],
+    ['page-wali-siswa', '🧑‍🎓 Data Siswa'],
+    ['page-wali-input', '📝 Input Kehadiran'],
+    ['page-wali-rekap', '📅 Rekap Kehadiran']
+  ];
+  nav.innerHTML = '';
+  items.forEach(function (it, idx) {
+    var a = document.createElement('a');
+    a.textContent = it[1];
+    a.onclick = function () { goToPage(it[0]); highlightMenu(a); };
+    if (idx === 0) a.classList.add('active');
+    nav.appendChild(a);
+  });
+}
+function highlightMenu(activeEl) {
+  document.querySelectorAll('#navMenu a').forEach(function (a) { a.classList.remove('active'); });
+  activeEl.classList.add('active');
+}
+function goToPage(pageId) {
+  document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+  var target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+
+  if (pageId === 'page-admin-siswa') loadStudentsAdmin();
+  if (pageId === 'page-admin-users') loadUsersAdmin();
+  if (pageId === 'page-admin-template') loadTemplateAdmin();
+  if (pageId === 'page-admin-cetak') loadTemplateOptionsForLetter();
+  if (pageId === 'page-admin-kehadiran') loadRekapAdmin();
+  if (pageId === 'page-admin-log') loadLogAdmin();
+  if (pageId === 'page-wali-siswa') loadStudentsWali();
+  if (pageId === 'page-wali-rekap') loadRekapWali();
+  document.getElementById('welcomeName') && (document.getElementById('welcomeName').textContent = STATE.user.nama);
+}
+
+/* ============================ DASHBOARD STATS ============================ */
+function loadAdminDashboardStats() {
+  serverCall('getStudents', [STATE.token, null], function (list) {
+    document.getElementById('statSiswa').textContent = list.length;
+  });
+  document.getElementById('statKelas').textContent = STATE.classes.length;
+  serverCall('getUsers', [STATE.token], function (list) {
+    document.getElementById('statGuru').textContent = list.filter(function (u) { return u.role === 'wali_kelas'; }).length;
+  });
+  var today = new Date().toISOString().slice(0, 10);
+  serverCall('getAttendance', [STATE.token, { tanggal: today, status: 'Hadir' }], function (list) {
+    document.getElementById('statHadirHariIni').textContent = list.length;
+  });
+}
+function loadWaliDashboardStats() {
+  serverCall('getStudents', [STATE.token, STATE.user.kelas], function (list) {
+    document.getElementById('waliStatSiswa').textContent = list.length;
+  });
+  var today = new Date().toISOString().slice(0, 10);
+  serverCall('getAttendance', [STATE.token, { tanggal: today, status: 'Hadir' }], function (list) {
+    document.getElementById('waliStatHadirHariIni').textContent = list.length;
+  });
+  var firstOfMonth = new Date(); firstOfMonth.setDate(1);
+  serverCall('getAttendance', [STATE.token, {
+    status: 'Alpha', tanggalMulai: firstOfMonth.toISOString().slice(0, 10), tanggalSelesai: today
+  }], function (list) {
+    document.getElementById('waliStatAlphaBulanIni').textContent = list.length;
+  });
+}
+
+/* ============================ ADMIN: DATA SISWA ============================ */
+function loadStudentsAdmin() {
+  var kelas = document.getElementById('filterKelasSiswa').value;
+  serverCall('getStudents', [STATE.token, kelas || null], function (list) {
+    var tbody = document.querySelector('#tableSiswa tbody');
+    tbody.innerHTML = list.map(function (s) {
+      return '<tr><td>' + s.nis + '</td><td>' + s.nama + '</td><td>' + s.jenisKelamin + '</td><td>' + s.kelas + '</td>' +
+        '<td>' + (s.namaOrtu || '-') + '</td><td>' + (s.noHpOrtu || '-') + '</td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick=\'editStudent(' + JSON.stringify(s).replace(/'/g, "&#39;") + ')\'>Edit</button> ' +
+        '<button class="btn btn-sm btn-danger" onclick="deleteStudentRow(\'' + s.id + '\',\'' + s.kelas + '\')">Hapus</button></td></tr>';
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);">Belum ada data</td></tr>';
+  });
+}
+document.getElementById('filterKelasSiswa').addEventListener('change', loadStudentsAdmin);
+
+function openStudentModal() {
+  document.getElementById('modalStudentTitle').textContent = 'Tambah Siswa';
+  ['stuId', 'stuNis', 'stuNisn', 'stuNama', 'stuOrtu', 'stuHp', 'stuAlamat'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('modalStudent').classList.remove('hidden');
+}
+function editStudent(s) {
+  document.getElementById('modalStudentTitle').textContent = 'Edit Siswa';
+  document.getElementById('stuId').value = s.id;
+  document.getElementById('stuNis').value = s.nis;
+  document.getElementById('stuNisn').value = s.nisn;
+  document.getElementById('stuNama').value = s.nama;
+  document.getElementById('stuJk').value = s.jenisKelamin;
+  document.getElementById('stuKelas').value = s.kelas;
+  document.getElementById('stuOrtu').value = s.namaOrtu;
+  document.getElementById('stuHp').value = s.noHpOrtu;
+  document.getElementById('stuAlamat').value = s.alamat;
+  document.getElementById('modalStudent').classList.remove('hidden');
+}
+function submitStudent() {
+  var s = {
+    id: document.getElementById('stuId').value,
+    nis: document.getElementById('stuNis').value.trim(),
+    nisn: document.getElementById('stuNisn').value.trim(),
+    nama: document.getElementById('stuNama').value.trim(),
+    jenisKelamin: document.getElementById('stuJk').value,
+    kelas: document.getElementById('stuKelas').value,
+    namaOrtu: document.getElementById('stuOrtu').value.trim(),
+    noHpOrtu: document.getElementById('stuHp').value.trim(),
+    alamat: document.getElementById('stuAlamat').value.trim()
+  };
+  if (!s.nama || !s.nis) { toast('Nama dan NIS wajib diisi', 'err'); return; }
+  var fn = s.id ? 'updateStudent' : 'addStudent';
+  serverCall(fn, [STATE.token, s], function () {
+    toast('Data siswa disimpan');
+    closeModal('modalStudent');
+    loadStudentsAdmin();
+  });
+}
+function deleteStudentRow(id, kelas) {
+  if (!confirm('Hapus data siswa ini?')) return;
+  serverCall('deleteStudent', [STATE.token, id, kelas], function () { toast('Siswa dihapus'); loadStudentsAdmin(); });
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+/* ============================ ADMIN: USERS ============================ */
+function loadUsersAdmin() {
+  serverCall('getUsers', [STATE.token], function (list) {
+    var tbody = document.querySelector('#tableUsers tbody');
+    tbody.innerHTML = list.map(function (u) {
+      var badge = u.aktif === false || String(u.aktif) === 'false' ? '<span class="badge badge-danger">Nonaktif</span>' : '<span class="badge badge-success">Aktif</span>';
+      return '<tr><td>' + u.username + '</td><td>' + u.nama + '</td><td>' + roleLabel(u.role) + '</td><td>' + (u.kelas || '-') + '</td><td>' + badge + '</td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick=\'editUser(' + JSON.stringify(u).replace(/'/g, "&#39;") + ')\'>Edit</button> ' +
+        '<button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.username + '\')">Hapus</button></td></tr>';
+    }).join('');
+  });
+}
+function toggleUserKelasField() {
+  document.getElementById('usrKelasField').style.display = document.getElementById('usrRole').value === 'wali_kelas' ? 'block' : 'none';
+}
+function openUserModal() {
+  document.getElementById('modalUserTitle').textContent = 'Tambah Akun';
+  document.getElementById('usrUsername').value = ''; document.getElementById('usrUsername').disabled = false;
+  document.getElementById('usrPassword').value = '';
+  document.getElementById('usrPwHint').textContent = '';
+  document.getElementById('usrNama').value = '';
+  document.getElementById('usrRole').value = 'wali_kelas';
+  document.getElementById('usrAktif').value = 'true';
+  toggleUserKelasField();
+  document.getElementById('modalUser').classList.remove('hidden');
+}
+function editUser(u) {
+  document.getElementById('modalUserTitle').textContent = 'Edit Akun';
+  document.getElementById('usrUsername').value = u.username; document.getElementById('usrUsername').disabled = true;
+  document.getElementById('usrPassword').value = '';
+  document.getElementById('usrPwHint').textContent = '(kosongkan jika tidak diubah)';
+  document.getElementById('usrNama').value = u.nama;
+  document.getElementById('usrRole').value = u.role;
+  document.getElementById('usrKelas').value = u.kelas;
+  document.getElementById('usrAktif').value = String(u.aktif);
+  toggleUserKelasField();
+  document.getElementById('modalUser').classList.remove('hidden');
+}
+function submitUser() {
+  var isEdit = document.getElementById('usrUsername').disabled;
+  var u = {
+    username: document.getElementById('usrUsername').value.trim(),
+    password: document.getElementById('usrPassword').value,
+    nama: document.getElementById('usrNama').value.trim(),
+    role: document.getElementById('usrRole').value,
+    kelas: document.getElementById('usrRole').value === 'wali_kelas' ? document.getElementById('usrKelas').value : '',
+    aktif: document.getElementById('usrAktif').value === 'true'
+  };
+  if (!u.username || !u.nama) { toast('Username dan Nama wajib diisi', 'err'); return; }
+  serverCall(isEdit ? 'updateUser' : 'addUser', [STATE.token, u], function () {
+    toast('Akun disimpan'); closeModal('modalUser'); loadUsersAdmin();
+  });
+}
+function deleteUserRow(username) {
+  if (!confirm('Hapus akun ' + username + '?')) return;
+  serverCall('deleteUser', [STATE.token, username], function () { toast('Akun dihapus'); loadUsersAdmin(); });
+}
+
+/* ============================ ADMIN: SETTINGS / LOGO ============================ */
+function saveAllSettings() {
+  var s = {
+    namaYayasan: document.getElementById('setNamaYayasan').value,
+    namaMadrasah: document.getElementById('setNamaMadrasah').value,
+    alamat: document.getElementById('setAlamat').value,
+    telepon: document.getElementById('setTelepon').value,
+    email: document.getElementById('setEmail').value,
+    npsn: document.getElementById('setNpsn').value,
+    namaKepalaSekolah: document.getElementById('setNamaKepsek').value,
+    nipKepalaSekolah: document.getElementById('setNipKepsek').value,
+    nomorSuratPrefix: document.getElementById('setNomorPrefix').value,
+    warnaTema: document.getElementById('setWarnaTema').value
+  };
+  serverCall('saveSettings', [STATE.token, s], function () { toast('Pengaturan disimpan'); loadSettingsGlobal(); });
+}
+function uploadLogoFile(jenis) {
+  var input = document.getElementById(jenis === 'surat' ? 'fileLogoSurat' : 'fileLogoSekolah');
+  var file = input.files[0];
+  if (!file) { toast('Pilih file terlebih dahulu', 'err'); return; }
+  var reader = new FileReader();
+  reader.onload = function () {
+    var base64 = reader.result.split(',')[1];
+    serverCall('uploadLogo', [STATE.token, base64, file.type, file.name, jenis], function (res) {
+      toast('Logo berhasil diunggah');
+      loadSettingsGlobal();
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ============================ ADMIN: TEMPLATE SURAT ============================ */
+function loadTemplateAdmin() {
+  serverCall('getLetterTemplates', [STATE.token], function (list) {
+    var tpl = list[0];
+    if (tpl) {
+      document.getElementById('tplId').value = tpl.id;
+      document.getElementById('tplJudul').value = tpl.judul;
+      document.getElementById('tplIsi').value = tpl.isi;
+    }
+  });
+}
+function saveTemplate() {
+  var tpl = { id: document.getElementById('tplId').value, judul: document.getElementById('tplJudul').value, isi: document.getElementById('tplIsi').value, aktif: true };
+  serverCall('saveLetterTemplate', [STATE.token, tpl], function (res) {
+    toast('Template disimpan');
+    document.getElementById('tplId').value = res.data.id;
+  });
+}
+
+/* ============================ ADMIN: CETAK SURAT ============================ */
+function loadTemplateOptionsForLetter() {
+  serverCall('getLetterTemplates', [STATE.token], function (list) {
+    var sel = document.getElementById('cetakTemplate');
+    sel.innerHTML = list.map(function (t) { return '<option value="' + t.id + '">' + t.judul + '</option>'; }).join('');
+  });
+}
+function loadStudentsForLetter() {
+  var kelas = document.getElementById('cetakKelas').value;
+  if (!kelas) return;
+  serverCall('getStudents', [STATE.token, kelas], function (list) {
+    var sel = document.getElementById('cetakSiswa');
+    sel.innerHTML = list.map(function (s) { return '<option value="' + s.id + '" data-nis="' + s.nis + '" data-nama="' + s.nama + '">' + s.nama + '</option>'; }).join('');
+  });
+}
+function cetakSuratIzin() {
+  var kelas = document.getElementById('cetakKelas').value;
+  var sel = document.getElementById('cetakSiswa');
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt) { toast('Pilih siswa terlebih dahulu', 'err'); return; }
+  var payload = {
+    namaSiswa: opt.getAttribute('data-nama'),
+    nis: opt.getAttribute('data-nis'),
+    kelas: kelas,
+    tanggalIzin: document.getElementById('cetakTanggal').value,
+    alasan: document.getElementById('cetakAlasan').value,
+    nomorSurat: document.getElementById('cetakNomor').value,
+    templateId: document.getElementById('cetakTemplate').value
+  };
+  if (!payload.tanggalIzin || !payload.alasan) { toast('Tanggal izin dan alasan wajib diisi', 'err'); return; }
+  serverCall('generateLetter', [STATE.token, payload], function (res) {
+    var w = window.open('', '_blank');
+    w.document.open(); w.document.write(res.html); w.document.close();
+    document.getElementById('cetakArchiveInfo').innerHTML = res.archiveUrl
+      ? 'Surat diarsipkan ke Drive: <a href="' + res.archiveUrl + '" target="_blank">Buka Arsip</a>'
+      : 'Surat berhasil dibuat.';
+    toast('Surat berhasil dibuat');
+  });
+}
+
+/* ============================ ADMIN: REKAP KEHADIRAN ============================ */
+function loadRekapAdmin() {
+  var filters = {
+    kelas: document.getElementById('rekapKelas').value,
+    tanggalMulai: document.getElementById('rekapDariTgl').value,
+    tanggalSelesai: document.getElementById('rekapSampaiTgl').value,
+    status: document.getElementById('rekapStatus').value
+  };
+  serverCall('getAttendanceRecap', [STATE.token, filters], function (list) {
+    document.querySelector('#tableRekapSiswa tbody').innerHTML = list.map(function (r) {
+      return '<tr><td>' + r.nama + '</td><td>' + r.kelas + '</td><td>' + r.Hadir + '</td><td>' + r.Izin + '</td><td>' + r.Sakit + '</td><td>' + r.Alpha + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Tidak ada data</td></tr>';
+  });
+  serverCall('getAttendance', [STATE.token, filters], function (list) {
+    document.querySelector('#tableDetailKehadiran tbody').innerHTML = list.map(function (r) {
+      return '<tr><td>' + r.tanggal + '</td><td>' + r.kelas + '</td><td>' + r.nama + '</td><td>' + statusBadge(r.status) + '</td><td>' + (r.catatan || '-') + '</td><td>' + r.inputOleh + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Tidak ada data</td></tr>';
+  });
+}
+function statusBadge(s) {
+  var cls = s === 'Hadir' ? 'badge-success' : s === 'Izin' ? 'badge-warning' : s === 'Sakit' ? 'badge-muted' : 'badge-danger';
+  return '<span class="badge ' + cls + '">' + s + '</span>';
+}
+
+/* ============================ ADMIN: LOG ============================ */
+function loadLogAdmin() {
+  serverCall('getActivityLog', [STATE.token], function (list) {
+    document.querySelector('#tableLog tbody').innerHTML = list.map(function (l) {
+      return '<tr><td>' + new Date(l.timestamp).toLocaleString('id-ID') + '</td><td>' + l.username + '</td><td>' + l.aksi + '</td><td>' + (l.detail || '-') + '</td></tr>';
+    }).join('');
+  });
+}
+
+/* ============================ WALI KELAS: DATA SISWA ============================ */
+function loadStudentsWali() {
+  serverCall('getStudents', [STATE.token, STATE.user.kelas], function (list) {
+    document.querySelector('#tableSiswaWali tbody').innerHTML = list.map(function (s) {
+      return '<tr><td>' + s.nis + '</td><td>' + s.nama + '</td><td>' + s.jenisKelamin + '</td><td>' + (s.namaOrtu || '-') + '</td><td>' + (s.noHpOrtu || '-') + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Belum ada siswa</td></tr>';
+  });
+}
+
+/* ============================ WALI KELAS: INPUT KEHADIRAN ============================ */
+var currentAttendanceStudents = [];
+function loadFormKehadiran() {
+  var tanggal = document.getElementById('inputTanggalHadir').value;
+  if (!tanggal) { toast('Pilih tanggal terlebih dahulu', 'err'); return; }
+  serverCall('getStudents', [STATE.token, STATE.user.kelas], function (students) {
+    currentAttendanceStudents = students;
+    serverCall('getAttendance', [STATE.token, { tanggal: tanggal }], function (existing) {
+      var tbody = document.querySelector('#tableInputKehadiran tbody');
+      tbody.innerHTML = students.map(function (s) {
+        var found = existing.find(function (e) { return e.siswaId === s.id; });
+        var status = found ? found.status : 'Hadir';
+        var catatan = found ? found.catatan : '';
+        return '<tr data-siswa-id="' + s.id + '">' +
+          '<td>' + s.nama + '</td>' +
+          '<td><select class="hadirStatus">' + ['Hadir', 'Izin', 'Sakit', 'Alpha'].map(function (st) {
+            return '<option value="' + st + '"' + (st === status ? ' selected' : '') + '>' + st + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><input class="hadirCatatan" value="' + (catatan || '').replace(/"/g, '&quot;') + '" placeholder="Catatan (opsional)"></td>' +
+          '</tr>';
+      }).join('');
+    });
+  });
+}
+function submitKehadiran() {
+  var tanggal = document.getElementById('inputTanggalHadir').value;
+  if (!tanggal) { toast('Pilih tanggal terlebih dahulu', 'err'); return; }
+  var rows = document.querySelectorAll('#tableInputKehadiran tbody tr');
+  var records = [];
+  rows.forEach(function (tr) {
+    var siswaId = tr.getAttribute('data-siswa-id');
+    var student = currentAttendanceStudents.find(function (s) { return s.id === siswaId; });
+    records.push({
+      tanggal: tanggal,
+      kelas: STATE.user.kelas,
+      siswaId: siswaId,
+      nama: student ? student.nama : '',
+      status: tr.querySelector('.hadirStatus').value,
+      catatan: tr.querySelector('.hadirCatatan').value
+    });
+  });
+  if (records.length === 0) { toast('Tidak ada data untuk disimpan', 'err'); return; }
+  serverCall('saveAttendanceBatch', [STATE.token, records], function () { toast('Kehadiran berhasil disimpan'); });
+}
+
+/* ============================ WALI KELAS: REKAP ============================ */
+function loadRekapWali() {
+  var filters = {
+    tanggalMulai: document.getElementById('waliRekapDari').value,
+    tanggalSelesai: document.getElementById('waliRekapSampai').value,
+    status: document.getElementById('waliRekapStatus').value
+  };
+  serverCall('getAttendanceRecap', [STATE.token, filters], function (list) {
+    document.querySelector('#tableRekapWali tbody').innerHTML = list.map(function (r) {
+      return '<tr><td>' + r.nama + '</td><td>' + r.Hadir + '</td><td>' + r.Izin + '</td><td>' + r.Sakit + '</td><td>' + r.Alpha + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Tidak ada data</td></tr>';
+  });
+  serverCall('getAttendance', [STATE.token, filters], function (list) {
+    document.querySelector('#tableDetailWali tbody').innerHTML = list.map(function (r) {
+      return '<tr><td>' + r.tanggal + '</td><td>' + r.nama + '</td><td>' + statusBadge(r.status) + '</td><td>' + (r.catatan || '-') + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Tidak ada data</td></tr>';
+  });
+}
+
+/* ============================ INIT ============================ */
+(function init() {
+  if (STATE.token && STATE.user) {
+    // Validasi token masih hidup dengan memuat settings
+    serverCall('getSettings', [STATE.token], function () { bootApp(); }, function () {
+      localStorage.removeItem('simToken'); localStorage.removeItem('simUser');
+    });
+  }
+})();
+</script>

@@ -1,0 +1,35 @@
+<!--
+  Catatan: Surat izin tidak dirender sebagai halaman terpisah di dalam
+  IFRAME sandbox HtmlService (karena keterbatasan window.print() di sandbox),
+  melainkan HTML surat hasil generateLetter() dibuka pada TAB BARU melalui
+  window.open() + document.write() dari JavaScriptClient.html, sehingga
+  tombol "Cetak / Simpan PDF" (window.print bawaan browser) berfungsi normal.
+
+  Fungsi pembangun HTML surat ada di Code.js -> buildLetterHtml().
+  File ini disediakan sebagai referensi struktur/layout surat apabila Anda
+  ingin mengubah tampilan cetak secara manual.
+-->
+<div id="printLetterTemplateReference" class="hidden">
+  <div class="kop">
+    <img src="{{logoSuratUrl}}"/>
+    <div>
+      <h1>{{namaYayasan}}</h1>
+      <h2>{{namaMadrasah}}</h2>
+      <p>{{alamat}}</p>
+    </div>
+  </div>
+  <div class="judul">
+    <h3>{{judulSurat}}</h3>
+    <p>Nomor: {{nomorSurat}}</p>
+  </div>
+  <div class="isi">{{isiSurat}}</div>
+  <div class="ttd">
+    <div class="kotak">
+      <p>Sumberduren, {{tanggalDibuat}}</p>
+      <p>Kepala Madrasah</p>
+      <div class="spasi"></div>
+      <p><strong><u>{{namaKepalaSekolah}}</u></strong></p>
+      <p>NIP. {{nipKepalaSekolah}}</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= appName ?></title>
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <!-- ===================== HALAMAN LOGIN ===================== -->
+  <?!= include('Login'); ?>
+
+  <!-- ===================== SHELL APLIKASI (setelah login) ===================== -->
+  <div id="appShell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="btnToggleSidebar" class="icon-btn">☰</button>
+        <img id="topLogo" class="top-logo" src="" alt="logo" style="display:none;">
+        <span class="brand-text">SIM MI Mambaul Ulum Sumberduren</span>
+      </div>
+      <div class="topbar-right">
+        <span id="userInfo"></span>
+        <button id="btnLogout" class="btn btn-outline">Keluar</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside id="sidebar" class="sidebar">
+        <nav id="navMenu"></nav>
+      </aside>
+
+      <main id="mainContent" class="main-content">
+        <!-- Konten Admin -->
+        <?!= include('AdminDashboard'); ?>
+        <!-- Konten Wali Kelas -->
+        <?!= include('TeacherDashboard'); ?>
+        <!-- Konten Pengaturan (khusus admin) -->
+        <?!= include('Settings'); ?>
+      </main>
+    </div>
+  </div>
+
+  <?!= include('JavaScriptClient'); ?>
+</body>
+</html>

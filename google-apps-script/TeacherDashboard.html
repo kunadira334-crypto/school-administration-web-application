@@ -1,0 +1,65 @@
+<!-- ======================= WALI KELAS: DASHBOARD ======================= -->
+<section id="page-wali-dashboard" class="page">
+  <h2 class="page-title">Dashboard Wali Kelas</h2>
+  <p class="page-sub">Selamat datang, <span id="waliWelcomeName"></span> (Kelas <span id="waliKelasLabel"></span>)</p>
+  <div class="grid grid-3">
+    <div class="card stat-card"><div class="num" id="waliStatSiswa">-</div><div class="label">Jumlah Siswa</div></div>
+    <div class="card stat-card"><div class="num" id="waliStatHadirHariIni">-</div><div class="label">Hadir Hari Ini</div></div>
+    <div class="card stat-card"><div class="num" id="waliStatAlphaBulanIni">-</div><div class="label">Alpha Bulan Ini</div></div>
+  </div>
+</section>
+
+<!-- ======================= WALI KELAS: DATA SISWA ======================= -->
+<section id="page-wali-siswa" class="page">
+  <h2 class="page-title">Data Siswa Kelas Saya</h2>
+  <p class="page-sub">Anda hanya dapat melihat siswa pada kelas yang Anda ampu.</p>
+  <div class="card">
+    <table id="tableSiswaWali">
+      <thead><tr><th>NIS</th><th>Nama</th><th>L/P</th><th>Nama Ortu</th><th>No HP</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================= WALI KELAS: INPUT KEHADIRAN ======================= -->
+<section id="page-wali-input" class="page">
+  <h2 class="page-title">Input Kehadiran Siswa</h2>
+  <p class="page-sub">Pilih tanggal, lalu tentukan status kehadiran tiap siswa</p>
+  <div class="toolbar">
+    <div class="field" style="margin-bottom:0;"><label>Tanggal</label><input type="date" id="inputTanggalHadir"></div>
+    <button class="btn btn-primary" onclick="loadFormKehadiran()">Muat Data</button>
+  </div>
+  <div class="card">
+    <table id="tableInputKehadiran">
+      <thead><tr><th>Nama</th><th>Status</th><th>Catatan</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button class="btn btn-primary" style="margin-top:14px;" onclick="submitKehadiran()">Simpan Kehadiran</button>
+  </div>
+</section>
+
+<!-- ======================= WALI KELAS: REKAP KEHADIRAN ======================= -->
+<section id="page-wali-rekap" class="page">
+  <h2 class="page-title">Rekap Kehadiran Kelas Saya</h2>
+  <div class="toolbar">
+    <div class="field" style="margin-bottom:0;"><label>Dari Tanggal</label><input type="date" id="waliRekapDari"></div>
+    <div class="field" style="margin-bottom:0;"><label>Sampai Tanggal</label><input type="date" id="waliRekapSampai"></div>
+    <div class="field" style="margin-bottom:0;"><label>Status</label>
+      <select id="waliRekapStatus"><option value="">Semua</option><option>Hadir</option><option>Izin</option><option>Sakit</option><option>Alpha</option></select></div>
+    <button class="btn btn-primary" onclick="loadRekapWali()">Terapkan Filter</button>
+  </div>
+  <div class="card">
+    <h3>Rekap per Siswa</h3>
+    <table id="tableRekapWali">
+      <thead><tr><th>Nama</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpha</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Detail Kehadiran</h3>
+    <table id="tableDetailWali">
+      <thead><tr><th>Tanggal</th><th>Nama</th><th>Status</th><th>Catatan</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
