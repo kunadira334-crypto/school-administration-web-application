@@ -6,7 +6,8 @@ Versi ini sudah diubah agar aplikasi React di Vercel membaca dan menulis data me
 
 - API serverless pada `api/index.js`.
 - Login tervalidasi dari sheet `Users`.
-- Data siswa tersimpan pada `Kelas 1` sampai `Kelas 6B`.
+- Data siswa tersimpan pada `Kelas 1` sampai `Kelas 6B`, dengan kolom nama ayah dan nama ibu terpisah.
+- Data kehadiran tersimpan per kelas pada `Kehadiran 1` sampai `Kehadiran 6B`.
 - Pengguna, pengaturan, template surat, kehadiran, log, dan arsip surat tersimpan di Spreadsheet.
 - Pembatasan wali kelas dilakukan di server.
 - Sheet dan header yang belum ada dibuat otomatis.
@@ -103,7 +104,7 @@ Segera ganti password awal dari menu Akun Pengguna.
 - `Users`
 - `Settings`
 - `Template Surat`
-- `Kehadiran`
+- `Kehadiran 1`, `Kehadiran 2`, `Kehadiran 3`, `Kehadiran 4`, `Kehadiran 5`, `Kehadiran 6A`, `Kehadiran 6B`
 - `Log Aktivitas`
 - `Arsip Surat`
 - `Kelas 1`, `Kelas 2`, `Kelas 3`, `Kelas 4`, `Kelas 5`, `Kelas 6A`, `Kelas 6B`
@@ -118,6 +119,6 @@ Nama sheet dan header jangan diubah.
 4. Buka Spreadsheet dan refresh sheet kelasnya.
 5. Ubah pengaturan sekolah dan periksa sheet `Settings`.
 6. Login sebagai wali kelas dan masukkan kehadiran.
-7. Periksa sheet `Kehadiran`.
+7. Periksa sheet kehadiran sesuai kelas, misalnya `Kehadiran 1`.
 
 Jika muncul pesan environment belum lengkap, periksa kembali ketiga variabel Google di Vercel dan lakukan Redeploy.

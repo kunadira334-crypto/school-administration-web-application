@@ -40,6 +40,7 @@ export default function CetakSurat() {
     }
     const finalNomor =
       nomorSurat || `${settings.nomorSuratPrefix}${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+    const waliKelas = db.getUsers().find((item) => item.role === 'wali_kelas' && item.kelas === student.kelas);
 
     const html = buildLetterHtml(
       {
@@ -48,6 +49,7 @@ export default function CetakSurat() {
         kelas: student.kelas,
         tanggalIzin: tanggal,
         alasan,
+        namaWaliKelas: waliKelas?.nama || `Wali Kelas ${student.kelas}`,
         templateIsi: tpl.isi,
         templateJudul: tpl.judul,
       },

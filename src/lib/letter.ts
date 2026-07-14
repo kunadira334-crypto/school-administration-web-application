@@ -6,6 +6,7 @@ export interface LetterPayload {
   kelas: string;
   tanggalIzin: string;
   alasan: string;
+  namaWaliKelas: string;
   nomorSurat?: string;
   templateIsi: string;
   templateJudul: string;
@@ -53,8 +54,8 @@ export function buildLetterHtml(payload: LetterPayload, settings: Settings, nomo
     .judul{text-align:center;margin:20px 0;}
     .judul h3{text-decoration:underline;margin:0;}
     .isi{margin-top:20px;line-height:1.8;text-align:justify;}
-    .ttd{margin-top:60px;display:flex;justify-content:flex-end;}
-    .ttd .kotak{text-align:center;}
+    .ttd{margin-top:60px;display:flex;justify-content:space-between;gap:40px;}
+    .ttd .kotak{text-align:center;min-width:220px;}
     .ttd .spasi{height:70px;}
     @media print{ .no-print{display:none;} }
   </style></head><body>
@@ -69,7 +70,14 @@ export function buildLetterHtml(payload: LetterPayload, settings: Settings, nomo
   </div>
   <div class="judul"><h3>${payload.templateJudul}</h3><p>Nomor: ${nomorSurat}</p></div>
   <div class="isi">${isi}</div>
-  <div class="ttd"><div class="kotak">
+  <div class="ttd">
+  <div class="kotak">
+    <p>&nbsp;</p>
+    <p>Wali Kelas ${payload.kelas}</p>
+    <div class="spasi"></div>
+    <p><strong><u>${payload.namaWaliKelas || `Wali Kelas ${payload.kelas}`}</u></strong></p>
+  </div>
+  <div class="kotak">
     <p>Sumberduren, ${tanggalDibuat}</p>
     <p>Kepala Madrasah</p>
     <div class="spasi"></div>

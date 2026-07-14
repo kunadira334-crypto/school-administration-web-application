@@ -16,7 +16,8 @@ export interface Student {
   nama: string;
   jenisKelamin: 'L' | 'P';
   kelas: string;
-  namaOrtu: string;
+  namaAyah: string;
+  namaIbu: string;
   noHpOrtu: string;
   alamat: string;
   aktif: boolean;

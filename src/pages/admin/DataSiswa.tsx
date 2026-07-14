@@ -12,7 +12,8 @@ const emptyStudent = (): Student => ({
   nama: '',
   jenisKelamin: 'L',
   kelas: '1',
-  namaOrtu: '',
+  namaAyah: '',
+  namaIbu: '',
   noHpOrtu: '',
   alamat: '',
   aktif: true,
@@ -87,15 +88,16 @@ export default function DataSiswa() {
       </div>
 
       <Card>
-        <Table headers={['NIS', 'Nama', 'L/P', 'Kelas', 'Nama Ortu', 'No HP', 'Aksi']}>
-          {filtered.length === 0 && <EmptyRow colSpan={7} />}
+        <Table headers={['NIS', 'Nama', 'L/P', 'Kelas', 'Nama Ayah', 'Nama Ibu', 'No HP', 'Aksi']}>
+          {filtered.length === 0 && <EmptyRow colSpan={8} />}
           {filtered.map((s) => (
             <tr key={s.id}>
               <td className="px-3 py-2">{s.nis}</td>
               <td className="px-3 py-2 font-medium">{s.nama}</td>
               <td className="px-3 py-2">{s.jenisKelamin}</td>
               <td className="px-3 py-2">{s.kelas}</td>
-              <td className="px-3 py-2">{s.namaOrtu || '-'}</td>
+              <td className="px-3 py-2">{s.namaAyah || '-'}</td>
+              <td className="px-3 py-2">{s.namaIbu || '-'}</td>
               <td className="px-3 py-2">{s.noHpOrtu || '-'}</td>
               <td className="px-3 py-2 whitespace-nowrap">
                 <button className="text-teal-700 text-xs font-semibold mr-3" onClick={() => openEdit(s)}>
@@ -144,9 +146,14 @@ export default function DataSiswa() {
               </select>
             </Field>
           </div>
-          <Field label="Nama Orang Tua/Wali">
-            <input className={inputCls} value={form.namaOrtu} onChange={(e) => setForm({ ...form, namaOrtu: e.target.value })} />
-          </Field>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3">
+            <Field label="Nama Ayah">
+              <input className={inputCls} value={form.namaAyah} onChange={(e) => setForm({ ...form, namaAyah: e.target.value })} />
+            </Field>
+            <Field label="Nama Ibu">
+              <input className={inputCls} value={form.namaIbu} onChange={(e) => setForm({ ...form, namaIbu: e.target.value })} />
+            </Field>
+          </div>
           <Field label="No HP Orang Tua">
             <input className={inputCls} value={form.noHpOrtu} onChange={(e) => setForm({ ...form, noHpOrtu: e.target.value })} />
           </Field>

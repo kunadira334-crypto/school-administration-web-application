@@ -1,14 +1,15 @@
 import crypto from 'node:crypto';
 
 const CLASS_LIST = ['1', '2', '3', '4', '5', '6A', '6B'];
+const ATTENDANCE_HEADERS = ['id', 'tanggal', 'kelas', 'siswaId', 'nama', 'status', 'catatan', 'inputOleh', 'createdAt'];
 const SCHEMAS = {
   Users: ['username', 'password', 'role', 'nama', 'kelas', 'aktif', 'createdAt'],
   Settings: ['key', 'value'],
   'Template Surat': ['id', 'judul', 'isi', 'aktif'],
-  Kehadiran: ['id', 'tanggal', 'kelas', 'siswaId', 'nama', 'status', 'catatan', 'inputOleh', 'createdAt'],
   'Log Aktivitas': ['timestamp', 'username', 'aksi', 'detail'],
   'Arsip Surat': ['id', 'namaSiswa', 'kelas', 'tanggalIzin', 'alasan', 'nomorSurat', 'html', 'createdAt'],
-  ...Object.fromEntries(CLASS_LIST.map((k) => [`Kelas ${k}`, ['id', 'nis', 'nisn', 'nama', 'jenisKelamin', 'kelas', 'namaOrtu', 'noHpOrtu', 'alamat', 'aktif']])),
+  ...Object.fromEntries(CLASS_LIST.map((k) => [`Kehadiran ${k}`, ATTENDANCE_HEADERS])),
+  ...Object.fromEntries(CLASS_LIST.map((k) => [`Kelas ${k}`, ['id', 'nis', 'nisn', 'nama', 'jenisKelamin', 'kelas', 'namaAyah', 'namaIbu', 'noHpOrtu', 'alamat', 'aktif']])),
 };
 
 const DEFAULT_SETTINGS = {
@@ -139,8 +140,25 @@ async function ensureSheets() {
       });
     }
     await Promise.all(Object.entries(SCHEMAS).map(async ([name, headers]) => {
-      const first = await getValues(name, `A1:${columnName(headers.length)}1`);
-      if (!first.length) await updateValues(name, [headers]);
+      const rows = await getValues(name);
+      if (!rows.length) {
+        await updateValues(name, [headers]);
+        return;
+      }
+      if (name.startsWith('Kelas ') && rows[0].join('|') !== headers.join('|')) {
+        const oldHeaders = rows[0];
+        const migratedRows = rows.slice(1).filter((row) => row.some((value) => value !== '')).map((row) => {
+          const old = Object.fromEntries(oldHeaders.map((key, index) => [key, row[index] ?? '']));
+          const student = {
+            ...old,
+            namaAyah: old.namaAyah || old.namaOrtu || '',
+            namaIbu: old.namaIbu || '',
+          };
+          return headers.map((key) => student[key] ?? '');
+        });
+        await clearValues(name);
+        await updateValues(name, [headers, ...migratedRows]);
+      }
     }));
     const users = await getTable('Users');
     if (!users.length) {
@@ -148,6 +166,7 @@ async function ensureSheets() {
     }
     const settings = await getTable('Settings');
     if (!settings.length) await appendValues('Settings', Object.entries(DEFAULT_SETTINGS));
+    await migrateLegacyAttendance(existing);
   })().catch((error) => {
     setupPromise = null;
     throw error;
@@ -185,6 +204,29 @@ async function writeTable(name, objects) {
   const rows = objects.map((obj) => headers.map((key) => obj[key] ?? ''));
   await clearValues(name);
   await updateValues(name, [headers, ...rows]);
+}
+
+async function migrateLegacyAttendance(existingSheets) {
+  const settings = await getTable('Settings');
+  if (settings.some((item) => item.key === 'attendancePerClassMigrated' && String(item.value) === 'true')) return;
+
+  if (existingSheets.has('Kehadiran')) {
+    const rows = await getValues('Kehadiran');
+    const headers = rows[0]?.length ? rows[0] : ATTENDANCE_HEADERS;
+    const legacyAttendance = rows.slice(1).filter((row) => row.some((value) => value !== '')).map((row) =>
+      Object.fromEntries(headers.map((key, index) => [key, parseValue(key, row[index])]))
+    );
+
+    await Promise.all(CLASS_LIST.map(async (kelas) => {
+      const sheetName = `Kehadiran ${kelas}`;
+      const existingClassAttendance = await getTable(sheetName);
+      if (!existingClassAttendance.length) {
+        await writeTable(sheetName, legacyAttendance.filter((item) => String(item.kelas) === kelas));
+      }
+    }));
+  }
+
+  await appendValues('Settings', [['attendancePerClassMigrated', 'true']]);
 }
 
 function sha256(value) {
@@ -235,9 +277,14 @@ async function getAllStudents() {
   return groups.flat();
 }
 
+async function getAllAttendance() {
+  const groups = await Promise.all(CLASS_LIST.map((k) => getTable(`Kehadiran ${k}`)));
+  return groups.flat();
+}
+
 async function bootstrap(session) {
   const [settings, students, attendance, templates] = await Promise.all([
-    getSettings(), getAllStudents(), getTable('Kehadiran'), getTable('Template Surat'),
+    getSettings(), getAllStudents(), getAllAttendance(), getTable('Template Surat'),
   ]);
   const isAdmin = session.role === 'admin';
   const scopedStudents = isAdmin ? students : students.filter((s) => s.kelas === session.kelas);
@@ -277,11 +324,12 @@ async function replaceResource(session, resource, data) {
   }
   if (resource === 'attendance') {
     if (session.role === 'wali_kelas') {
-      const existing = await getTable('Kehadiran');
       const allowed = data.filter((a) => a.kelas === session.kelas);
-      await writeTable('Kehadiran', [...existing.filter((a) => a.kelas !== session.kelas), ...allowed]);
+      await writeTable(`Kehadiran ${session.kelas}`, allowed);
     } else {
-      await writeTable('Kehadiran', data);
+      await Promise.all(CLASS_LIST.map((kelas) =>
+        writeTable(`Kehadiran ${kelas}`, data.filter((a) => a.kelas === kelas))
+      ));
     }
     return;
   }
