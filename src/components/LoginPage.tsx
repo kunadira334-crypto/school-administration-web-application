@@ -19,11 +19,6 @@ export default function LoginPage() {
     setSubmitting(false);
   }
 
-  function quickFill(u: string, p: string) {
-    setUsername(u);
-    setPassword(p);
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f766e 0%, #164e63 100%)' }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 md:p-10">
@@ -51,14 +46,6 @@ export default function LoginPage() {
             {submitting ? 'Menghubungkan ke Spreadsheet…' : 'Masuk'}
           </button>
         </form>
-
-        <div className="mt-6 border-t pt-4">
-          <p className="text-xs text-gray-400 text-center mb-2">Akun awal:</p>
-          <div className="flex flex-wrap gap-2 justify-center">
-            <button type="button" onClick={() => quickFill('admin', 'admin123')} className="text-xs bg-teal-50 text-teal-700 px-3 py-1 rounded-full hover:bg-teal-100">Admin</button>
-            <button type="button" onClick={() => quickFill('wali1', 'wali123')} className="text-xs bg-teal-50 text-teal-700 px-3 py-1 rounded-full hover:bg-teal-100">Wali Kelas 1</button>
-          </div>
-        </div>
       </div>
     </div>
   );
