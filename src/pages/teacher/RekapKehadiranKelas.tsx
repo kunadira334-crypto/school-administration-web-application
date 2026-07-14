@@ -3,12 +3,14 @@ import { useAuth } from '../../lib/AuthContext';
 import { db } from '../../lib/storage';
 import { AttendanceStatus } from '../../types';
 import { Badge, Card, EmptyRow, Field, inputCls, PageTitle, Table } from '../../components/ui';
+import SemesterAttendanceRecap from '../../components/SemesterAttendanceRecap';
 
 export default function RekapKehadiranKelas() {
   const { user } = useAuth();
   const [dari, setDari] = useState('');
   const [sampai, setSampai] = useState('');
   const [status, setStatus] = useState('');
+  const [mode, setMode] = useState<'detail' | 'semester'>('detail');
 
   const attendance = db.getAttendance().filter((a) => a.kelas === user?.kelas);
 
@@ -32,7 +34,36 @@ export default function RekapKehadiranKelas() {
 
   return (
     <div>
-      <PageTitle title="Rekap Kehadiran Kelas Saya" />
+      <PageTitle title="Rekap Kehadiran Kelas Saya" subtitle="Lihat rekap harian atau rangkuman ketidakhadiran satu semester" />
+      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Jenis rekap kehadiran">
+        <button
+          type="button"
+          onClick={() => setMode('detail')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            mode === 'detail' ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-gray-700 border-gray-300'
+          }`}
+        >
+          Rekap Harian
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('semester')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            mode === 'semester' ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-gray-700 border-gray-300'
+          }`}
+        >
+          Rekap Semester
+        </button>
+      </div>
+
+      {mode === 'semester' ? (
+        <SemesterAttendanceRecap
+          students={db.getStudents()}
+          attendance={attendance}
+          fixedClass={user?.kelas || ''}
+        />
+      ) : (
+        <>
       <Card className="mb-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Field label="Dari Tanggal">
@@ -85,6 +116,8 @@ export default function RekapKehadiranKelas() {
           ))}
         </Table>
       </Card>
+        </>
+      )}
     </div>
   );
 }
