@@ -14,17 +14,26 @@ export default function CetakSurat() {
   const allStudents = db.getStudents();
 
   const [kelas, setKelas] = useState('');
-  const [siswaId, setSiswaId] = useState('');
+  const [siswaKey, setSiswaKey] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [alasan, setAlasan] = useState('');
   const [nomorSurat, setNomorSurat] = useState('');
   const [templateId, setTemplateId] = useState(templates[0]?.id || '');
   const [archiveInfo, setArchiveInfo] = useState('');
 
-  const studentsInClass = useMemo(() => allStudents.filter((s) => s.kelas === kelas), [kelas, allStudents]);
+  const studentOptions = useMemo(
+    () =>
+      allStudents
+        .map((student, index) => ({
+          student,
+          key: `${student.id || 'tanpa-id'}::${student.nis || 'tanpa-nis'}::${index}`,
+        }))
+        .filter(({ student }) => String(student.kelas).trim() === String(kelas).trim()),
+    [kelas, allStudents]
+  );
 
   function cetak() {
-    const student = studentsInClass.find((s) => s.id === siswaId);
+    const student = studentOptions.find((option) => option.key === siswaKey)?.student;
     const tpl = templates.find((t) => t.id === templateId) || templates[0];
     if (!student) {
       notify('Pilih siswa terlebih dahulu', 'err');
@@ -40,7 +49,13 @@ export default function CetakSurat() {
     }
     const finalNomor =
       nomorSurat || `${settings.nomorSuratPrefix}${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
-    const waliKelas = db.getUsers().find((item) => item.role === 'wali_kelas' && item.kelas === student.kelas);
+    const waliKelas = db
+      .getUsers()
+      .find(
+        (item) =>
+          item.role === 'wali_kelas' &&
+          String(item.kelas).trim() === String(student.kelas).trim()
+      );
 
     const html = buildLetterHtml(
       {
@@ -90,7 +105,7 @@ export default function CetakSurat() {
               value={kelas}
               onChange={(e) => {
                 setKelas(e.target.value);
-                setSiswaId('');
+                setSiswaKey('');
               }}
             >
               <option value="">Pilih Kelas</option>
@@ -102,14 +117,22 @@ export default function CetakSurat() {
             </select>
           </Field>
           <Field label="Nama Siswa">
-            <select className={inputCls} value={siswaId} onChange={(e) => setSiswaId(e.target.value)}>
-              <option value="">Pilih Siswa</option>
-              {studentsInClass.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nama}
+            <select
+              className={inputCls}
+              value={siswaKey}
+              onChange={(e) => setSiswaKey(e.target.value)}
+              disabled={!kelas}
+            >
+              <option value="">{kelas ? 'Pilih Siswa' : 'Pilih kelas terlebih dahulu'}</option>
+              {studentOptions.map(({ student, key }) => (
+                <option key={key} value={key}>
+                  {student.nama}{student.nis ? ` — NIS ${student.nis}` : ''}
                 </option>
               ))}
             </select>
+            {kelas && studentOptions.length === 0 && (
+              <p className="mt-1 text-xs text-red-600">Belum ada data siswa pada kelas ini.</p>
+            )}
           </Field>
           <Field label="Tanggal Izin">
             <input type="date" className={inputCls} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
